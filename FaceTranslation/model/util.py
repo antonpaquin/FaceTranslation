@@ -1,4 +1,3 @@
-from datetime import datetime
 import os
 
 import torch
@@ -7,7 +6,7 @@ from FaceTranslation.util import project_root
 
 
 def save_model(model, timestamp):
-    tstamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    tstamp = timestamp.strftime('%Y-%m-%dT%H:%M:%S')
     model_dir = os.path.join(project_root, 'models', tstamp)
     os.makedirs(model_dir, exist_ok=True)
     torch.save(model, os.path.join(model_dir, 'model.pt'))

@@ -15,7 +15,7 @@ class DataGen:
         while True:
             shuffle(self.filenames)
             for file in self.filenames:
-                yield np.load(file)
+                yield np.load(file).mean(axis=2)[:, :, None]
 
     def batch_stream(self, batch_size):
         file_stream = self.stream()
