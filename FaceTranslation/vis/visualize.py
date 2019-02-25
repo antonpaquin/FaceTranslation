@@ -17,30 +17,39 @@ def np_to_image(arr):
     return Image.fromarray(arr, 'L')
 
 
+def get_x(batch):
+    return torch.tensor(next(batch)).permute(0, 3, 1, 2).float()
+
+
 def main():
-    human_stream = DataGen('human').stream()
-    anime_stream = DataGen('anime').stream()
+    human_stream = DataGen('human').batch_stream(batch_size=8)
+    anime_stream = DataGen('anime').batch_stream(batch_size=8)
     model = load_model()
 
+    cross = True
     n = 0
     while True:
         if (n % 2 == 0):
-            x = torch.tensor(next(anime_stream)).permute(2, 0, 1).float()
-            x = x[None, :, :, :]
-            key_enc = torch.ones_like(x)
+            x = get_x(anime_stream)
+            key_enc = torch.zeros((8,))
         else:
-            x = torch.tensor(next(human_stream)).permute(2, 0, 1).float()
-            x = x[None, :, :, :]
-            key_enc = torch.zeros_like(x)
+            x = get_x(human_stream)
+            key_enc = torch.ones((8,))
+
+        if cross:
+            key_enc = 1 - key_enc
+
         n += 1
 
         x_pred, _ = model(x, key_enc)
 
         print(x.size())
+        print(x.min(), x.max())
         im_x = np_to_image(x.detach().numpy())
         im_x.save(os.path.join(project_root, 'vis', 'x.png'))
 
         print(x_pred.size())
+        print((x_pred.min().item(), x_pred.max().item()))
         im_pred = np_to_image(x_pred.detach().numpy())
         im_pred.save(os.path.join(project_root, 'vis', 'pred.png'))
 
