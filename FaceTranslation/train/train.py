@@ -28,36 +28,36 @@ def report_step(step, enc_loss, adv_loss, cross_loss):
     ))
 
 
-# Anton:
-# Initial results indicate that there's something there, though it still is rough around the edges.
-# Reading up on BicycleGAN, cross-domain disentanglement, StyleGAN was pretty useful.
+# Anton: wtf
 
-# Turns out the bluriness is caused by loss fn issues, for which the only solution is adversarial loss
-# --> I need to stick a discriminator on the output and train until the model isn't sure which is real
+# First, make sure disc out has nonzero gradients wrt x
+# It's so accurate it's making me think that there's info being dropped somewhere
+# --> there's something that G can see that D cant (besides the key)
 
-# StyleGAN turns out to be just a fancy kind of generator, which should be applicable here.
-# It does a kind of thing where it starts with a small deep constant representation and then grows it while adding
-# noise, and the latent space vector is a set of (scale, bias) pairs that are applied to the net twice per growth step
-# e.g.
-#    const
-#    + noise
-#   (z-transform) * scale + bias z1 (this layer is called AdaIN)
-#    conv
-#    AdaIN (z2)
-#    upscale
-#    + noise
-#    AdaIN (z3)
-#    ...
-# I still don't know the exact form of Z -- is it a single constant per layer or does it have an (x,y) component?
-# --> (1x1x2) or (dim x dim x 2), not sure
+# If that's not the case, see if there's any easy discriminator upgrades possible
+# It might be that deep conv isn't the right way to solve is it anime
 
-# Had an idea for the discriminator -- UNet seems to be pretty popular, but the easy way to do a discriminator is to
-# have a single ndarray input and if you do UNet and capture the intermediate space you end up with some horrible
-# unconcatable mess of ((8x8x512), (16x16x256), (32x32x128), ...)
-# Soln: we're already doing (conv conv relu pool), maybe just concat the relevant layer when the decoding gets to the
-# right size
+# Or just leave it running for a few days, or bump up disc loss weight again
+# Who knows maybe it will converge
+# I might have to let D train below 0.2 again
 
-# Still need to read the TwinGAN paper, results look not nearly as good as the StyleGAN ones but maybe it can be adapted
+# I'd like to try some kind of morphing / distortion with the generator but that will
+# take *math* (!) and still won't help without a good discriminator
+
+# I was thinking about another D on gen vs orig after G, but it looks like StyleGAN
+# and MSE are handling things just fine
+
+# G is good enough that I might try adding color back in
+# I think that would mostly help D...?
+
+# Also maybe ask gwern
+
+
+# Morphing:
+
+# Some kind of 2d recurrent bullshit?
+
+# Figure out the math behind grid expand / contract?
 
 
 def get_x(batch):
@@ -66,11 +66,12 @@ def get_x(batch):
 
 def main():
     batch_size = 32
-    num_steps = 3000
+    num_steps = 30000
 
     run_timestamp = datetime.now()
 
-    model = CombinedModel(scalebias_per_step=2)
+    #model = CombinedModel(scalebias_per_step=2)
+    model = load_model()
 
     anime_batch = DataGen('anime').batch_stream(batch_size)
     human_batch = DataGen('human').batch_stream(batch_size)
@@ -105,7 +106,7 @@ def main():
 
         encoder_loss = (3 * enc_loss_fn(g, x))
         discriminator_loss = (3 * disc_loss_fn(d, adv_label))
-        cross_loss = (.5 * encoder_loss) + (.5 * (1 - discriminator_loss).clamp(min=0))
+        cross_loss = (.2 * encoder_loss) + (.8 * (1 - discriminator_loss).clamp(min=0))
 
         report_step(step, encoder_loss.item(), discriminator_loss.item(), cross_loss.item())
         if step % 10 == 0:
